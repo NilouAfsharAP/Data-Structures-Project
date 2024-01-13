@@ -1,6 +1,9 @@
 import pygame
 from sys import exit
 from random import*
+import os
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 
 class Node:
@@ -109,6 +112,24 @@ class Stack:
             self._stack.delete_at_end()
             return value
 
+class Queue:
+    queue = DoublyLinkedList()
+
+    def enqueue(self, value):
+        self.queue.insert_at_front(value)
+
+    def dequeue(self):
+        if self.queue.length != 0:
+            x = self.queue.get(self.queue.length-1)
+            self.queue.delete_at_end()
+            return x
+
+    def size(self):
+        return self.queue.length
+
+    def clear(self):
+        self.queue.clear()
+
 class TreeNode:
     def __init__(self, key, value):
         self.key = key
@@ -158,6 +179,11 @@ class TreeDictionary:
 class Player(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
+        self.health = 5
+        self.counter = 0  # To control unwanted inputs
+        self.counter_start = False
+        self.heart = pygame.image.load("files/graphics/player/heart.png").convert_alpha()
+        self.heart = pygame.transform.scale(self.heart, (25,25))
         self.player_off = pygame.image.load("files/graphics/player/playeroff.png").convert_alpha()
         self.player_off = pygame.transform.scale(self.player_off,(96,102))
         self.player_on = pygame.image.load("files/graphics/player/playeron.png").convert_alpha()
@@ -166,12 +192,16 @@ class Player(pygame.sprite.Sprite):
         self.player_index = 0
         self.image = self.player_images[self.player_index].convert_alpha()
         self.rect = self.image.get_rect(midbottom=(width/2,0.95*height))
-
-        self.bullet = pygame.image.load("files/graphics/player/bullet.png").convert_alpha()
+        self.machinegun = pygame.image.load("files/graphics/player/machinegun.png").convert_alpha()
         self.shotgun = pygame.image.load("files/graphics/player/shotgun.png").convert_alpha()
         self.laser = pygame.image.load("files/graphics/player/laser.png").convert_alpha()
+        self.guns = Queue()
+        self.guns.enqueue({"name": "shotgun", "ammo": 8, "image": self.shotgun})
+        self.guns.enqueue({"name": "laser", "ammo": 5, "image": self.laser})
+        self.current_gun = {"name": "machinegun", "ammo": 100, "image": self.machinegun}
 
     def player_input(self):
+        # Moving
         keys = pygame.key.get_pressed()
         if keys[pygame.K_d] and self.rect.right < width:
             self.rect.right += 8
@@ -184,15 +214,46 @@ class Player(pygame.sprite.Sprite):
                 self.rect.left = 0
             print("m_left")
 
+        # Change Ammo & Shoot
+        if self.counter == 0:
+            if keys[pygame.K_c]:
+                self.guns.enqueue(self.current_gun)
+                self.current_gun = self.guns.dequeue()
+                self.counter_start = True
+            # check for shoot here
+        if self.counter_start:
+            self.counter += 1
+            if self.counter > 10:
+                self.counter = 0
+                self.counter_start = False
+
+    # implement shoot function in here
+    def shoot(self):
+        info = {"health": self.health, "guntype": self.current_gun["name"], "player_rect": self.rect}
+
+
     def animation_state(self):
         self.player_index += 0.3
         if self.player_index >= len(self.player_images):
             self.player_index = 0
         self.image = self.player_images[int(self.player_index)]
 
+    def hud(self):
+        gun = pygame.transform.scale(self.current_gun["image"],(25,50))
+        screen.blit(gun,(width*0.93,height*0.88))
+        for i in range(self.health):
+            screen.blit(self.heart,(width*0.9+i*20,height*0.95))
+
     def update(self):
-        self.animation_state()
         self.player_input()
+        self.animation_state()
+        self.hud()
+
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self, player_info):
+        super().__init__()
+        if player_info["guntype"] == "machinegun":
+            pass
 
 def load_game_states():
     states = Stack()
@@ -240,11 +301,14 @@ def load_menu():
 def load_levels():
     lvl_background = pygame.image.load("files/graphics/backgrounds/levelBackground.jpg").convert_alpha()
     lvl_background = pygame.transform.scale(lvl_background,(width,height))
-
     level_dict = TreeDictionary()
     level_dict.insert("lvl_background",lvl_background)
 
     return level_dict
+
+def set_player_info(info):
+    player_info = info
+
 
 
 # Program Start
